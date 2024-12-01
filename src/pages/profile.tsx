@@ -22,6 +22,8 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const isDev = import.meta.env.DEV
+  const basePath = isDev ? '' : '/hrmis-web-beta'
 
   useEffect(() => {
     const checkUser = async () => {
@@ -44,18 +46,23 @@ export default function ProfilePage() {
 
         if (profileData) {
           setProfile(profileData)
-          setAvatarUrl(profileData.avatar_url)
+          if (profileData.avatar_url) {
+            const { data } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(profileData.avatar_url)
+            setAvatarUrl(data.publicUrl)
+          }
         }
       } catch (error) {
         console.error('Error:', error)
-        navigate('/login')
+        navigate(`${basePath}/login`)
       } finally {
         setLoading(false)
       }
     }
 
     checkUser()
-  }, [navigate])
+  }, [navigate, basePath])
 
   const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -77,10 +84,6 @@ export default function ProfilePage() {
         throw uploadError
       }
 
-      const { data } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath)
-
       if (!profile) return
 
       const updates: Partial<Profile> = {
@@ -97,44 +100,44 @@ export default function ProfilePage() {
         throw updateError
       }
 
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
       setAvatarUrl(data.publicUrl)
       toast.success('Avatar updated successfully!')
-    } catch (error) {
-      toast.error('Error uploading avatar!')
-      console.log(error)
+    } catch (error: any) {
+      toast.error(error.message)
     } finally {
       setUploading(false)
     }
   }
 
-  const handleSaveProfile = async () => {
+  const updateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    
     try {
-      if (!user?.id || !profile) return
+      if (!profile) return
 
-      const updates: Partial<Profile> = {
-        full_name: profile.full_name,
-        birthday: profile.birthday,
-        age: profile.age,
-        avatar_url: avatarUrl,
+      const formData = new FormData(e.currentTarget)
+      const updates: ProfileUpdatePayload = {
+        full_name: formData.get('full_name') as string,
+        birthday: formData.get('birthday') as string,
+        age: parseInt(formData.get('age') as string) || null,
         updated_at: new Date().toISOString(),
       }
 
-      const { data: updatedProfile, error } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('id', user.id)
-        .select()
-        .single()
+        .eq('id', user?.id)
 
       if (error) throw error
 
-      if (updatedProfile) {
-        setProfile(updatedProfile)
-        toast.success('Profile updated successfully!')
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error)
-      toast.error('Error updating profile')
+      setProfile({ ...profile, ...updates })
+      toast.success('Profile updated successfully!')
+    } catch (error: any) {
+      toast.error(error.message)
     }
   }
 
@@ -148,108 +151,92 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Profile Settings</h1>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+          <h1 className="text-3xl font-bold">Profile</h1>
+          <Button variant="outline" onClick={() => navigate(`${basePath}/dashboard`)}>
             Back to Dashboard
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit Profile</CardTitle>
-            <CardDescription>Update your personal information</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveProfile(); }} className="space-y-6">
-              <div className="flex flex-col items-center space-y-4">
-                <Avatar>
+        <div className="grid gap-6">
+          {/* Avatar Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Picture</CardTitle>
+              <CardDescription>Click the avatar to upload a new image</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center space-y-4">
+              <Label htmlFor="avatar" className="cursor-pointer">
+                <Avatar className="h-32 w-32">
                   <AvatarImage src={avatarUrl || undefined} />
                   <AvatarFallback>
                     {profile?.full_name?.split(' ').map(n => n[0]).join('') || '?'}
                   </AvatarFallback>
                 </Avatar>
+              </Label>
+              <Input
+                id="avatar"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={uploadAvatar}
+                disabled={uploading}
+              />
+              {uploading && <div>Uploading...</div>}
+            </CardContent>
+          </Card>
 
-                <div className="flex items-center space-x-2">
-                  <Label
-                    htmlFor="avatar"
-                    className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
-                  >
-                    {uploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4 mr-2" />
-                    )}
-                    Change Avatar
-                  </Label>
+          {/* Profile Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Personal Information</CardTitle>
+              <CardDescription>Update your personal details</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={updateProfile} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="avatar"
-                    type="file"
-                    accept="image/*"
-                    onChange={uploadAvatar}
-                    disabled={uploading}
-                    className="hidden"
+                    id="email"
+                    type="email"
+                    value={user?.email}
+                    disabled
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  value={profile?.full_name || ''}
-                  onChange={(e) => setProfile(prev => ({ ...prev!, full_name: e.target.value }))}
-                  placeholder="Enter your full name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  value={user?.email || ''}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Email cannot be changed
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="birthday">Birthday</Label>
-                <Input
-                  id="birthday"
-                  type="date"
-                  value={profile?.birthday || ''}
-                  onChange={(e) => setProfile(prev => ({ ...prev!, birthday: e.target.value }))}
-                  max={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  value={profile?.age || ''}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Age is automatically calculated from birthday
-                </p>
-              </div>
-
-              <div className="flex justify-end">
+                <div className="space-y-2">
+                  <Label htmlFor="full_name">Full Name</Label>
+                  <Input
+                    id="full_name"
+                    name="full_name"
+                    defaultValue={profile?.full_name || ''}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="birthday">Birthday</Label>
+                  <Input
+                    id="birthday"
+                    name="birthday"
+                    type="date"
+                    defaultValue={profile?.birthday || ''}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="age">Age</Label>
+                  <Input
+                    id="age"
+                    name="age"
+                    type="number"
+                    defaultValue={profile?.age || ''}
+                  />
+                </div>
                 <Button type="submit">
-                  Save Changes
+                  Update Profile
                 </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
