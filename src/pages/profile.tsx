@@ -137,44 +137,32 @@ export default function ProfilePage() {
     }
   }
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-
+  const handleSaveProfile = async () => {
     try {
-      const updates = {
-        id: user.id,
-        full_name: profile?.full_name,
-        age: profile?.age,
-        birthday: profile?.birthday,
-        avatar_url: profile?.avatar_url,
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error: profileError } = await supabase
+      const { data: updatedProfile, error } = await supabase
         .from('profiles')
-        .upsert(updates)
+        .update({
+          full_name: profile?.full_name,
+          birthday: profile?.birthday?.toISOString(),
+          age: profile?.age,
+          avatar_url: profile?.avatar_url,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user?.id)
+        .select()
+        .single();
 
-      if (profileError) throw profileError
+      if (error) throw error;
 
-      const { error: userError } = await supabase.auth.updateUser({
-        data: { full_name: profile?.full_name },
-      })
-
-      if (userError) throw userError
-      
-      toast.success('Profile updated successfully!', {
-        description: 'Your changes have been saved.'
-      })
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+        toast.success('Profile updated successfully!');
+      }
     } catch (error) {
-      toast.error('Failed to update profile', {
-        description: 'Please try again. If the problem persists, contact support.'
-      })
-      console.error(error)
-    } finally {
-      setSaving(false)
+      console.error('Error updating profile:', error);
+      toast.error('Error updating profile');
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -200,7 +188,7 @@ export default function ProfilePage() {
             <CardDescription>Update your personal information</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleUpdateProfile} className="space-y-6">
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveProfile(); }} className="space-y-6">
               <div className="flex flex-col items-center space-y-4">
                 <Avatar>
                   <AvatarImage src={avatarUrl || undefined} />
