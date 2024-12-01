@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import { Button } from "../components/ui/button"
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Camera, Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../components/ui/card"
-import { Input } from "../components/ui/input"
-import { Label } from "../components/ui/label"
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { CalendarIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { type Profile, type ProfileUpdatePayload } from "@/lib/types"
 
 interface Profile {
   id: string
@@ -22,6 +27,14 @@ interface Profile {
   age: number
   birthday: string
   avatar_url: string | null
+}
+
+interface ProfileUpdatePayload {
+  full_name: string
+  birthday: string
+  age: number
+  avatar_url: string | null
+  updated_at: string
 }
 
 export default function ProfilePage() {
@@ -34,31 +47,38 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        navigate('/login')
-        return
-      }
-      setUser(user)
-      
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (error) {
-        console.error('Error fetching profile:', error)
-      } else {
-        setProfile(profile)
-        if (profile.avatar_url) {
-          const { data } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(profile.avatar_url)
-          setAvatarUrl(data.publicUrl)
+      try {
+        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
+        if (userError || !currentUser) {
+          throw userError || new Error('User not found')
         }
+        setUser(currentUser)
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single()
+
+        if (profileError) {
+          throw profileError
+        }
+
+        if (profile) {
+          setProfile(profile)
+          if (profile.avatar_url) {
+            const { data } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(profile.avatar_url)
+            setAvatarUrl(data.publicUrl)
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error)
+        navigate('/login')
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     checkUser()
@@ -111,7 +131,7 @@ export default function ProfilePage() {
         .from('avatars')
         .getPublicUrl(filePath)
 
-      const updates = {
+      const updates: ProfileUpdatePayload = {
         ...profile,
         avatar_url: filePath,
         updated_at: new Date().toISOString(),
@@ -138,16 +158,20 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
+      if (!user?.id || !profile) return;
+
+      const updates: ProfileUpdatePayload = {
+        full_name: profile.full_name,
+        birthday: profile.birthday,
+        age: profile.age,
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      }
+
       const { data: updatedProfile, error } = await supabase
         .from('profiles')
-        .update({
-          full_name: profile?.full_name,
-          birthday: profile?.birthday,
-          age: profile?.age,
-          avatar_url: avatarUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user?.id)
+        .update(updates)
+        .eq('id', user.id)
         .select()
         .single();
 
