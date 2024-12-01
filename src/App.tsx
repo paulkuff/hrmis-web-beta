@@ -5,13 +5,17 @@ import DashboardPage from './pages/dashboard'
 import ProfilePage from './pages/profile'
 import ForgotPasswordPage from './pages/forgot-password'
 import ResetPasswordPage from './pages/reset-password'
+import AuthCallbackPage from './pages/auth/callback'
 import { Toaster } from './components/ui/sonner'
 import { ThemeProvider } from 'next-themes'
 
 function App() {
+  const isDev = import.meta.env.DEV
+  const basePath = isDev ? '' : '/hrmis-web-beta'
+
   return (
     <ThemeProvider>
-      <Router>
+      <Router basename={basePath}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -19,6 +23,7 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         <Toaster />
