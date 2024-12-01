@@ -13,29 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { type Profile, type ProfileUpdatePayload } from "@/lib/types"
-
-interface Profile {
-  id: string
-  full_name: string
-  updated_at: string
-  age: number
-  birthday: string
-  avatar_url: string | null
-}
-
-interface ProfileUpdatePayload {
-  full_name: string
-  birthday: string
-  age: number
-  avatar_url: string | null
-  updated_at: string
-}
 
 export default function ProfilePage() {
   const navigate = useNavigate()
@@ -54,7 +32,7 @@ export default function ProfilePage() {
         }
         setUser(currentUser)
 
-        const { data: profile, error: profileError } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', currentUser.id)
@@ -64,14 +42,9 @@ export default function ProfilePage() {
           throw profileError
         }
 
-        if (profile) {
-          setProfile(profile)
-          if (profile.avatar_url) {
-            const { data } = supabase.storage
-              .from('avatars')
-              .getPublicUrl(profile.avatar_url)
-            setAvatarUrl(data.publicUrl)
-          }
+        if (profileData) {
+          setProfile(profileData)
+          setAvatarUrl(profileData.avatar_url)
         }
       } catch (error) {
         console.error('Error:', error)
@@ -84,40 +57,17 @@ export default function ProfilePage() {
     checkUser()
   }, [navigate])
 
-  const calculateAge = (birthday: string) => {
-    const birthDate = new Date(birthday);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
-  const handleBirthdayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const birthday = e.target.value;
-    const age = calculateAge(birthday);
-    setProfile(prev => ({ 
-      ...prev!, 
-      birthday: birthday,
-      age: age
-    }));
-  };
-
   const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true)
-      
+
       if (!event.target.files || event.target.files.length === 0) {
         throw new Error('You must select an image to upload.')
       }
 
       const file = event.target.files[0]
       const fileExt = file.name.split('.').pop()
-      const filePath = `${user.id}-${Math.random()}.${fileExt}`
+      const filePath = `${user?.id}-${Math.random()}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
@@ -131,26 +81,27 @@ export default function ProfilePage() {
         .from('avatars')
         .getPublicUrl(filePath)
 
-      const updates: ProfileUpdatePayload = {
-        ...profile,
+      if (!profile) return
+
+      const updates: Partial<Profile> = {
         avatar_url: filePath,
         updated_at: new Date().toISOString(),
       }
 
       const { error: updateError } = await supabase
         .from('profiles')
-        .upsert(updates)
+        .update(updates)
+        .eq('id', user?.id)
 
       if (updateError) {
         throw updateError
       }
 
-      setProfile(updates)
       setAvatarUrl(data.publicUrl)
       toast.success('Avatar updated successfully!')
     } catch (error) {
       toast.error('Error uploading avatar!')
-      console.error(error)
+      console.log(error)
     } finally {
       setUploading(false)
     }
@@ -158,9 +109,9 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
-      if (!user?.id || !profile) return;
+      if (!user?.id || !profile) return
 
-      const updates: ProfileUpdatePayload = {
+      const updates: Partial<Profile> = {
         full_name: profile.full_name,
         birthday: profile.birthday,
         age: profile.age,
@@ -173,19 +124,19 @@ export default function ProfilePage() {
         .update(updates)
         .eq('id', user.id)
         .select()
-        .single();
+        .single()
 
-      if (error) throw error;
+      if (error) throw error
 
       if (updatedProfile) {
-        setProfile(updatedProfile);
-        toast.success('Profile updated successfully!');
+        setProfile(updatedProfile)
+        toast.success('Profile updated successfully!')
       }
     } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Error updating profile');
+      console.error('Error updating profile:', error)
+      toast.error('Error updating profile')
     }
-  };
+  }
 
   if (loading) {
     return (
@@ -272,7 +223,7 @@ export default function ProfilePage() {
                   id="birthday"
                   type="date"
                   value={profile?.birthday || ''}
-                  onChange={handleBirthdayChange}
+                  onChange={(e) => setProfile(prev => ({ ...prev!, birthday: e.target.value }))}
                   max={new Date().toISOString().split('T')[0]}
                 />
               </div>
