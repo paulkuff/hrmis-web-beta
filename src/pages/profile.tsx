@@ -22,8 +22,6 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const isDev = import.meta.env.DEV
-  const basePath = isDev ? '' : '/hrmis-web-beta'
 
   useEffect(() => {
     const checkUser = async () => {
@@ -55,19 +53,17 @@ export default function ProfilePage() {
         }
       } catch (error) {
         console.error('Error:', error)
-        navigate(`${basePath}/login`)
+        navigate('/login')
       } finally {
         setLoading(false)
       }
     }
 
     checkUser()
-  }, [navigate, basePath])
+  }, [navigate])
 
   const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      setUploading(true)
-
       if (!event.target.files || event.target.files.length === 0) {
         throw new Error('You must select an image to upload.')
       }
@@ -75,6 +71,8 @@ export default function ProfilePage() {
       const file = event.target.files[0]
       const fileExt = file.name.split('.').pop()
       const filePath = `${user?.id}-${Math.random()}.${fileExt}`
+
+      setUploading(true)
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
@@ -84,9 +82,7 @@ export default function ProfilePage() {
         throw uploadError
       }
 
-      if (!profile) return
-
-      const updates: Partial<Profile> = {
+      const updates: ProfileUpdatePayload = {
         avatar_url: filePath,
         updated_at: new Date().toISOString(),
       }
@@ -106,27 +102,25 @@ export default function ProfilePage() {
 
       setAvatarUrl(data.publicUrl)
       toast.success('Avatar updated successfully!')
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error) {
+      toast.error('Error uploading avatar!')
+      console.error('Error:', error)
     } finally {
       setUploading(false)
     }
   }
 
-  const updateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const updateProfile = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     
+    const formData = new FormData(event.currentTarget)
+    const updates: ProfileUpdatePayload = {
+      full_name: formData.get('fullName') as string,
+      birthday: formData.get('birthday') as string,
+      updated_at: new Date().toISOString(),
+    }
+
     try {
-      if (!profile) return
-
-      const formData = new FormData(e.currentTarget)
-      const updates: ProfileUpdatePayload = {
-        full_name: formData.get('full_name') as string,
-        birthday: formData.get('birthday') as string,
-        age: parseInt(formData.get('age') as string) || null,
-        updated_at: new Date().toISOString(),
-      }
-
       const { error } = await supabase
         .from('profiles')
         .update(updates)
@@ -134,10 +128,11 @@ export default function ProfilePage() {
 
       if (error) throw error
 
-      setProfile({ ...profile, ...updates })
+      setProfile(prev => prev ? { ...prev, ...updates } : null)
       toast.success('Profile updated successfully!')
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error) {
+      toast.error('Error updating profile!')
+      console.error('Error:', error)
     }
   }
 
@@ -205,10 +200,11 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
+                  <Label htmlFor="fullName">Full Name</Label>
                   <Input
-                    id="full_name"
-                    name="full_name"
+                    id="fullName"
+                    name="fullName"
+                    placeholder="Enter your full name"
                     defaultValue={profile?.full_name || ''}
                   />
                 </div>
@@ -221,16 +217,7 @@ export default function ProfilePage() {
                     defaultValue={profile?.birthday || ''}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
-                  <Input
-                    id="age"
-                    name="age"
-                    type="number"
-                    defaultValue={profile?.age || ''}
-                  />
-                </div>
-                <Button type="submit">
+                <Button type="submit" className="w-full">
                   Update Profile
                 </Button>
               </form>

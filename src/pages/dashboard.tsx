@@ -16,8 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChangePasswordForm } from '@/components/change-password-form'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ChangePasswordForm } from '@/components/change-password-form'
 
 interface Profile {
   id: string
@@ -32,53 +32,53 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [user, setUser] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const isDev = import.meta.env.DEV
-  const basePath = isDev ? '' : '/hrmis-web-beta'
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError || !user) {
+        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
+        if (userError || !currentUser) {
           throw userError || new Error('User not found')
         }
-        setUser(user)
-        
-        const { data: profile, error: profileError } = await supabase
+        setUser(currentUser)
+
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+          .eq('id', currentUser.id)
           .single()
 
         if (profileError) {
-          console.error('Error fetching profile:', profileError)
-        } else if (profile) {
-          setProfile(profile)
-          if (profile.avatar_url) {
+          throw profileError
+        }
+
+        if (profileData) {
+          setProfile(profileData)
+          if (profileData.avatar_url) {
             const { data } = supabase.storage
               .from('avatars')
-              .getPublicUrl(profile.avatar_url)
+              .getPublicUrl(profileData.avatar_url)
             setAvatarUrl(data.publicUrl)
           }
         }
       } catch (error) {
         console.error('Error:', error)
-        navigate(`${basePath}/login`)
+        navigate('/login')
       } finally {
         setLoading(false)
       }
     }
 
     checkUser()
-  }, [navigate, basePath])
+  }, [navigate])
 
   const handleSignOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-      navigate(`${basePath}/login`)
+      navigate('/login')
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -111,7 +111,7 @@ export default function DashboardPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate(`${basePath}/profile`)}>
+              <DropdownMenuItem onClick={() => navigate('/profile')}>
                 Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
