@@ -8,6 +8,7 @@ import ResetPasswordPage from './pages/reset-password'
 import AuthCallbackPage from './pages/auth/callback'
 import { Toaster } from './components/ui/sonner'
 import { ThemeProvider } from 'next-themes'
+import { ProtectedRoute } from './components/protected-route'
 
 function App() {
   const isDev = import.meta.env.DEV
@@ -19,8 +20,22 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
