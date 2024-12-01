@@ -1,31 +1,31 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import { Button } from "../components/ui/button"
+import { supabase } from '@/lib/supabase'
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../components/ui/card"
+} from "@/components/ui/card"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu"
-import { ChangePasswordForm } from '../components/change-password-form'
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
+} from "@/components/ui/dropdown-menu"
+import { ChangePasswordForm } from '@/components/change-password-form'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface Profile {
   id: string
-  full_name: string
-  updated_at: string
-  age: number
-  birthday: string
+  full_name: string | null
   avatar_url: string | null
+  birthday: string | null
+  age: number | null
+  updated_at: string
 }
 
 export default function DashboardPage() {
@@ -34,42 +34,54 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [user, setUser] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const isDev = import.meta.env.DEV
+  const basePath = isDev ? '' : '/hrmis-web-beta'
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        navigate('/login')
-        return
-      }
-      setUser(user)
-      
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (error) {
-        console.error('Error fetching profile:', error)
-      } else {
-        setProfile(profile)
-        if (profile.avatar_url) {
-          const { data } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(profile.avatar_url)
-          setAvatarUrl(data.publicUrl)
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+          throw userError || new Error('User not found')
         }
+        setUser(user)
+        
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError)
+        } else if (profile) {
+          setProfile(profile)
+          if (profile.avatar_url) {
+            const { data } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(profile.avatar_url)
+            setAvatarUrl(data.publicUrl)
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error)
+        navigate(`${basePath}/login`)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     checkUser()
-  }, [navigate])
+  }, [navigate, basePath])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    navigate('/login')
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      navigate(`${basePath}/login`)
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
   }
 
   if (loading) {
@@ -99,7 +111,7 @@ export default function DashboardPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
+              <DropdownMenuItem onClick={() => navigate(`${basePath}/profile`)}>
                 Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -111,81 +123,53 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Content */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Profile Card */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Your personal information</CardDescription>
+              <CardTitle>Welcome Back!</CardTitle>
+              <CardDescription>
+                {profile?.full_name ? `Good to see you, ${profile.full_name}!` : 'Complete your profile to get started'}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col items-center mb-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={avatarUrl || undefined} />
-                  <AvatarFallback>
-                    {profile?.full_name?.split(' ').map(n => n[0]).join('') || '?'}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                <div className="text-lg">{profile?.full_name}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Email</label>
-                <div className="text-lg">{user?.email}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Birthday</label>
-                <div className="text-lg">
-                  {profile?.birthday 
-                    ? new Date(profile.birthday).toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })
-                    : 'Not set'}
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                This is your dashboard where you can manage your profile and settings.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Status</CardTitle>
+              <CardDescription>Your profile completion status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Full Name</span>
+                  <span>{profile?.full_name ? '✓' : '×'}</span>
                 </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Age</label>
-                <div className="text-lg">{profile?.age || 'Not set'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
-                <div className="text-sm">
-                  {profile?.updated_at ? new Date(profile.updated_at).toLocaleDateString() : 'N/A'}
+                <div className="flex justify-between">
+                  <span>Birthday</span>
+                  <span>{profile?.birthday ? '✓' : '×'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Avatar</span>
+                  <span>{profile?.avatar_url ? '✓' : '×'}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Stats Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Account Overview</CardTitle>
-              <CardDescription>Your account statistics</CardDescription>
+              <CardTitle>Security</CardTitle>
+              <CardDescription>Update your password</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Account Created</label>
-                <div className="text-lg">
-                  {new Date(user?.created_at).toLocaleDateString()}
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Email Status</label>
-                <div className="text-lg">
-                  {user?.email_confirmed_at ? 'Verified' : 'Pending Verification'}
-                </div>
-              </div>
+            <CardContent>
+              <ChangePasswordForm />
             </CardContent>
           </Card>
-
-          {/* Change Password Form */}
-          <div className="md:col-span-2">
-            <ChangePasswordForm />
-          </div>
         </div>
       </div>
     </div>
