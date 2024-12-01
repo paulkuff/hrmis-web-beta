@@ -27,11 +27,10 @@ interface Profile {
 export default function ProfilePage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [user, setUser] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -143,9 +142,9 @@ export default function ProfilePage() {
         .from('profiles')
         .update({
           full_name: profile?.full_name,
-          birthday: profile?.birthday?.toISOString(),
+          birthday: profile?.birthday,
           age: profile?.age,
-          avatar_url: profile?.avatar_url,
+          avatar_url: avatarUrl,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user?.id)
@@ -269,8 +268,8 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Changes'}
+                <Button type="submit">
+                  Save Changes
                 </Button>
               </div>
             </form>
