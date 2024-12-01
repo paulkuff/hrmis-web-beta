@@ -154,7 +154,7 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Profile</h1>
-          <Button variant="outline" onClick={() => navigate(`${basePath}/dashboard`)}>
+          <Button variant="outline" onClick={() => navigate('/dashboard')}>
             Back to Dashboard
           </Button>
         </div>

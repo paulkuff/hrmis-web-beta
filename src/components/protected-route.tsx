@@ -10,8 +10,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const location = useLocation()
-  const isDev = import.meta.env.DEV
-  const basePath = isDev ? '' : '/hrmis-web-beta'
 
   useEffect(() => {
     const checkUser = async () => {
@@ -48,7 +46,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!user) {
     // Save the attempted URL for redirecting after login
-    return <Navigate to={`${basePath}/login`} state={{ from: location }} replace />
+    return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   return <>{children}</>

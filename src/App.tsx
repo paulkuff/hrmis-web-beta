@@ -12,11 +12,11 @@ import { ProtectedRoute } from './components/protected-route'
 
 function App() {
   const isDev = import.meta.env.DEV
-  const basePath = isDev ? '' : '/hrmis-web-beta'
+  const basename = isDev ? '' : '/hrmis-web-beta'
 
   return (
     <ThemeProvider>
-      <Router basename={basePath}>
+      <Router basename={basename}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
